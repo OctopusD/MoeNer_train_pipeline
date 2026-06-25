@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import inspect
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -104,6 +106,7 @@ class MoENER(nn.Module):
         self.model_config = model_config
         self.encoder_config = AutoConfig.from_pretrained(model_config.pretrained_model)
         self.bert = AutoModel.from_pretrained(model_config.pretrained_model)
+        self.encoder_accepts_bbox = _accepts_forward_arg(self.bert, "bbox")
         self.dropout = nn.Dropout(model_config.dropout_prob)
         self.num_domains = model_config.num_domains or len(model_config.domain_names)
         self.num_experts = model_config.num_experts
@@ -139,7 +142,14 @@ class MoENER(nn.Module):
     ) -> dict:
         """运行编码器、router、专家和领域专属分类器。"""
 
-        encoder_outputs = self.bert(input_ids=input_ids, bbox=bbox, attention_mask=attention_mask, return_dict=True)
+        encoder_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "return_dict": True,
+        }
+        if self.encoder_accepts_bbox:
+            encoder_inputs["bbox"] = bbox
+        encoder_outputs = self.bert(**encoder_inputs)
         sequence_output = self.dropout(encoder_outputs.last_hidden_state)
         router_outputs = self.router(
             sequence_output,
@@ -246,3 +256,13 @@ def create_model(model_config: ModelConfig):
     if model_config.name == "moe_ner":
         return MoENER(model_config)
     raise ValueError(f"不支持的模型: {model_config.name}")
+
+
+def _accepts_forward_arg(module: nn.Module, arg_name: str) -> bool:
+    """返回模块 forward 是否声明或透传指定参数。"""
+
+    signature = inspect.signature(module.forward)
+    return arg_name in signature.parameters or any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
