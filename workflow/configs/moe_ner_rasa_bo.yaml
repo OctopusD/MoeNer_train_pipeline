@@ -1,0 +1,81 @@
+experiment:
+  name: moe_ner_rasa_bo
+  output_dir: training_outputs
+  seed: 42
+
+data:
+  name: rasa_bo
+  data_dir: /path/to/data_converted_medium
+  domain_names:
+    - Airplane
+    - Train
+    - Hotel
+  tokenizer_name_or_path: /path/to/baize_large
+  max_seq_length: 512
+  train_batch_size: 128
+  eval_batch_size: 4
+  num_workers: 1
+
+model:
+  name: moe_ner
+  pretrained_model: /path/to/baize_large
+  dropout_prob: 0.1
+  num_experts: 5
+  use_topk_routing: true
+  top_k: 2
+  router_hidden_dim: 256
+  expert_hidden_size: 512
+
+loss:
+  ner_loss: weighted_ce
+  domain_loss: focal
+  load_balance_loss: kl_uniform
+  loss_weights:
+    ner: 1.0
+    domain: 1.0
+    load_balance: 0.1
+  entity_weight: 1.0
+  non_entity_weight: 0.1
+  focal_gamma: 2.0
+  focal_alpha: null
+
+optimizer:
+  name: adamw
+  learning_rate: 5.0e-4
+  weight_decay: 0.01
+
+scheduler:
+  name: one_cycle
+  warmup_ratio: 0.1
+  anneal_strategy: cos
+
+checkpoint:
+  init_checkpoint: ""
+  resume_from: null
+  save_dir: training_outputs
+  save_interval: 1
+  save_optimizer: true
+  resume_optimizer: true
+  monitor: entity_level.overall.f1
+  mode: max
+
+train:
+  device: auto
+  num_epochs: 25
+  gradient_clip_norm: 1.0
+  early_stopping_patience: 5
+  validation_interval: 1
+  use_gt_domains_for_classification_train: false
+  use_gt_domains_for_classification_eval: false
+  use_gt_domains_for_routing_epochs: 3
+  use_gt_domains_for_routing_eval: false
+  compute_expert_frequency: false
+
+stages:
+  - start_epoch: 0
+    end_epoch: 3
+    param_groups:
+      - params: [bert]
+        lr: 0.0
+      - params: [router, experts, domain_classifiers]
+        lr: 5.0e-4
