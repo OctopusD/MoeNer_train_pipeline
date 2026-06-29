@@ -30,11 +30,11 @@ class TrainingPipeline:
     def run(self) -> TrainingState:
         """构建全部组件并执行训练。"""
 
-        set_seed(self.config.experiment.seed)
-        print(f"已设置随机种子: {self.config.experiment.seed}")
-
         device_context = resolve_device(self.config.train.device)
         print(f"已解析设备: {device_context.device}, GPU数量: {device_context.n_gpu}")
+
+        set_seed(self.config.experiment.seed)
+        print(f"已设置随机种子: {self.config.experiment.seed}")
 
         if self.config.data.name != "rasa_bo":
             raise ValueError(f"不支持的数据模块: {self.config.data.name}")

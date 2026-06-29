@@ -32,10 +32,12 @@ def resolve_device(device_config: Any = "auto") -> DeviceContext:
 def _resolve_gpu_list(device_config: list | tuple) -> DeviceContext:
     """将 CUDA 可见范围限制为配置的物理 GPU ID。"""
 
-    if not device_config or not torch.cuda.is_available():
+    if not device_config:
         return DeviceContext(device=torch.device("cpu"), n_gpu=0)
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(str(gpu_id) for gpu_id in device_config)
-    return DeviceContext(device=torch.device("cuda"), n_gpu=len(device_config))
+    if not torch.cuda.is_available():
+        return DeviceContext(device=torch.device("cpu"), n_gpu=0)
+    return DeviceContext(device=torch.device("cuda"), n_gpu=torch.cuda.device_count())
 
 
 def _resolve_device_string(device_config: str) -> DeviceContext:
@@ -52,4 +54,3 @@ def _resolve_device_string(device_config: str) -> DeviceContext:
         n_gpu = 1 if ":" in normalized else torch.cuda.device_count()
         return DeviceContext(device=torch.device(device_config), n_gpu=n_gpu)
     return DeviceContext(device=torch.device("cpu"), n_gpu=0)
-
